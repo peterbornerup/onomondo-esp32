@@ -11,7 +11,7 @@ Onomondo::Onomondo(LEDHandler *leds) : leds_(leds)
 	// Set console baud rate
 	SerialMon.begin(115200);
 
-#ifdef DUMP_AT_COMMANDS //yeee. 
+#ifdef DUMP_AT_COMMANDS //yeee.
 	debugger_ = new StreamDebugger(SerialAT, SerialMon);
 	modem_ = new TinyGsm(*debugger_);
 #else
@@ -62,10 +62,19 @@ uint8_t Onomondo::connect(char *server, int port)
 	if (leds_)
 		leds_->changeState(STATE_NETWORK);
 
-	if (!modem_->waitForNetwork(60000L))
+	if (!modem_->waitForNetwork(40000L))
 	{
-		Db("Failed to register to the network");
-		return 0;
+		//clear forbidden network liest...
+		DB("Failed to connect. Clearing the forbidden network list (FPLMN)...");
+
+		sendATExpectOK("+CRSM=214,28539,0,0,12,\"FFFFFFFFFFFFFFFFFFFFFFFF\"");
+
+		//retry
+		if (!modem_->waitForNetwork(60000L))
+		{
+			Db("Failed to register to the network");
+			return 0;
+		}
 	}
 
 	if (!modem_->isNetworkConnected())
@@ -83,16 +92,16 @@ uint8_t Onomondo::connect(char *server, int port)
 	if (leds_)
 		leds_->changeState(STATE_DATA);
 
-
 	//set apn
 	int n = 0;
-	while (!(success = sendATExpectOK("+CSTT=\"onomondo\"")) && n++ < 6)
+	while (!(success = sendATExpectOK("+CSTT=\"sinternet\"")) && n++ < 6)
 	{
 		DB("Retrying... cstt");
 		delay(1000);
 	}
-	if (!success){
-		DB("failed to set APN: onomondo (+CSTT)")
+	if (!success)
+	{
+		DB("failed to set APN: onomondo (+CSTT)");
 		return 0;
 	}
 
@@ -100,12 +109,13 @@ uint8_t Onomondo::connect(char *server, int port)
 
 	//status
 	//WE MUST WAIT FOR A "1" RESPONSE
-	while (!(success = sendATOKResp("+CGATT?", "1")) && n++ < 10)
+	while (!(success = sendATOKResp("+CGATT?", "1")) && n++ < 15)
 	{
 		DB("CGATT>>>");
-		delay(500);
+		delay(700);
 	}
-	if (!success){
+	if (!success)
+	{
 		Db("Failed to attach to packet domain service (+CGATT)");
 		return 0;
 	}
@@ -118,7 +128,8 @@ uint8_t Onomondo::connect(char *server, int port)
 		//DB("Retrying... CIICR");
 		delay(1000);
 	}
-	if (!success){
+	if (!success)
+	{
 		DB("Failed to bring up GPRS. Maybe the data is blocked by onomondo? (+CIICR)");
 		return 0;
 	}
@@ -128,7 +139,8 @@ uint8_t Onomondo::connect(char *server, int port)
 	//ip adress //must be read for some reason. See SIM800 datasheet
 	modem_->sendAT("+CIFSR");
 	//wait for response
-	while (!SerialAT.available());
+	while (!SerialAT.available())
+		;
 	while (SerialAT.available())
 	{
 		SerialMon.write(SerialAT.read());
@@ -147,7 +159,8 @@ uint8_t Onomondo::connect(char *server, int port)
 		DB("Retrying... tcp connection stuff");
 		delay(1000);
 	}
-	if (!success){
+	if (!success)
+	{
 		DB("Modem failed to initialize TCP stack..");
 		return 0;
 	}

@@ -110,7 +110,7 @@ void loop()
 			// waiiiiiit
 			// measurement IS ready long time ago. Just in case we do it like this.
 			delay(1);
-		}
+		}	
 
 		doc["temperature"] = (float)tempSensor.readTemperatureC(); //add the measurement to the document
 
@@ -127,14 +127,14 @@ void loop()
 
 		TCPOk = onomondo->writeTCP(serializedJson, size);
 
-		if (!TCPOk)
+		if (!TCPOk){
 			error();
+		}
 	}
 
 	//disconnect
 	if (connected)
 		onomondo->disconnect();
-
 	//flash ledsssss (and make some nice effect)
 	leds.changeState(STATE_DONE);
 	delay(200);
