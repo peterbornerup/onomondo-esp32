@@ -94,7 +94,7 @@ uint8_t Onomondo::connect(char *server, int port)
 
 	//set apn
 	int n = 0;
-	while (!(success = sendATExpectOK("+CSTT=\"sinternet\"")) && n++ < 6)
+	while (!(success = sendATExpectOK("+CSTT=\"onomondo\"")) && n++ < 6)
 	{
 		DB("Retrying... cstt");
 		delay(1000);
