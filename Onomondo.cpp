@@ -1,8 +1,5 @@
 #include "Onomondo.h"
 
-#define DB SerialMon.println
-#define Db SerialMon.print
-
 #define DEFAULT_DELAY 300
 
 Onomondo::Onomondo(LEDHandler *leds) : leds_(leds) {
@@ -64,6 +61,10 @@ uint8_t Onomondo::connect(char *server, int port) {
         //retry
         if (!modem_->waitForNetwork(60000L)) {
             Db("Failed to register to the network");
+
+            Db("Clearing the forbidden network list (FPLMN)... :) ");
+            sendATExpectOK("+CRSM=214,28539,0,0,12,\"FFFFFFFFFFFFFFFFFFFFFFFF\"");
+
             return 0;
         }
     }
@@ -84,7 +85,11 @@ uint8_t Onomondo::connect(char *server, int port) {
 
     //set apn
     int n = 0;
-    while (!(success = sendATExpectOK("+CSTT=\"onomondo\"")) && n++ < 6) {
+
+    char apnString[50];
+    sprintf(apnString, "+CSTT=\"%s\"", APN);
+
+    while (!(success = sendATExpectOK(apnString)) && n++ < 6) {
         DB("Retrying... cstt");
         delay(1000);
     }
@@ -93,25 +98,30 @@ uint8_t Onomondo::connect(char *server, int port) {
         return 0;
     }
 
-    delay(DEFAULT_DELAY);
+    delay(DEFAULT_DELAY * 3);
 
+    if (CPOL == 1) {
+        this->printCPOL();
+    }
+
+    delay(DEFAULT_DELAY * 3);
     //status
     //WE MUST WAIT FOR A "1" RESPONSE
     while (!(success = sendATOKResp("+CGATT?", "1")) && n++ < 15) {
         DB("CGATT>>>");
-        delay(700);
+        delay(1000);
     }
     if (!success) {
         Db("Failed to attach to packet domain service (+CGATT)");
         return 0;
     }
 
-    delay(DEFAULT_DELAY);
+    delay(DEFAULT_DELAY * 6);
 
     //bring up GPRS
     while (!(success = sendATExpectOK("+CIICR")) && n++ < 10) {
         //DB("Retrying... CIICR");
-        delay(1000);
+        delay(2000);
     }
     if (!success) {
         DB("Failed to bring up GPRS. Maybe the data is blocked by onomondo? (+CIICR)");
@@ -123,6 +133,7 @@ uint8_t Onomondo::connect(char *server, int port) {
     //ip adress //must be read for some reason. See SIM800 datasheet
     modem_->sendAT("+CIFSR");
     //wait for response
+    // delay(300);
     while (!SerialAT.available())
         ;
     while (SerialAT.available()) {

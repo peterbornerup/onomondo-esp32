@@ -1,6 +1,7 @@
 #pragma once
 
 #define SIM800L_IP5306_VERSION_20190610
+#include "settings.h"
 #include "utilities.h"
 // Set serial for debug console (to the Serial Monitor, default speed 115200)
 #define SerialMon Serial
@@ -17,6 +18,9 @@
 #ifdef DUMP_AT_COMMANDS
 #include <StreamDebugger.h>
 #endif
+
+#define DB SerialMon.println
+#define Db SerialMon.print
 
 #include <Wire.h>
 
@@ -42,20 +46,26 @@ class Onomondo {
 
     uint8_t sleep();
 
+    uint8_t printCPOL() {
+        this->sendATExpectOK("+CPOL?");
+    }
+
     uint16_t getSignalQuality() {
         //
         static uint16_t signal = 99;
 
         if (modem_) {
-            uint61_t tmp = modem_->getSignalQuality();
+            uint16_t tmp = modem_->getSignalQuality();
             // if 99 modem failed to get signal quality
             // polling again seems to fix the problem.
             if (tmp == 99) {
                 return modem_->getSignalQuality();
             }
+
+            return tmp;
         }
         //error: modem not initialized
-        return -1;
+        return 0;
     }
 
    private:
