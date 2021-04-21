@@ -32,7 +32,7 @@
 class Onomondo {
    public:
     //initializes the modem...
-    Onomondo(LEDHandler *leds = NULL);
+    Onomondo(void (*statusCallback)(modemStates) = NULL);
 
     ~Onomondo();
 
@@ -69,7 +69,7 @@ class Onomondo {
     }
 
    private:
-    LEDHandler *leds_ = NULL;
+       void (*cb_)(modemStates) = NULL;
 
     const char *apn = "onomondo";  // Your APN
 #ifdef DUMP_AT_COMMANDS

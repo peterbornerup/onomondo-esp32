@@ -2,7 +2,7 @@
 
 #define DEFAULT_DELAY 300
 
-Onomondo::Onomondo(LEDHandler *leds) : leds_(leds) {
+Onomondo::Onomondo(void (*statusCallback)(modemStates)) {
     // Set console baud rate
     SerialMon.begin(115200);
 
@@ -12,6 +12,8 @@ Onomondo::Onomondo(LEDHandler *leds) : leds_(leds) {
 #else
     modem_ = new TinyGsm(SerialAT);
 #endif  // DUMP_AT_COMMANDS
+
+    cb_ = statusCallback;
 
     // PMU settings (specific to the ESP32 board used)
     Wire.beginTransmission(IP5306_ADDR);
@@ -49,11 +51,12 @@ uint8_t Onomondo::connect(char *server, int port) {
     }
 
     //we now register on the network
-    if (leds_)
-        leds_->changeState(STATE_NETWORK);
+    if (cb_)
+        cb_(STATE_NETWORK);
 
     if (!modem_->waitForNetwork(40000L)) {
-        //clear forbidden network liest...
+        // might be problems with missing whitelist
+        // clear forbidden network liest...
         DB("Failed to connect. Clearing the forbidden network list (FPLMN)...");
 
         sendATExpectOK("+CRSM=214,28539,0,0,12,\"FFFFFFFFFFFFFFFFFFFFFFFF\"");
@@ -62,6 +65,7 @@ uint8_t Onomondo::connect(char *server, int port) {
         if (!modem_->waitForNetwork(60000L)) {
             Db("Failed to register to the network");
 
+            //clear it for next run.
             Db("Clearing the forbidden network list (FPLMN)... :) ");
             sendATExpectOK("+CRSM=214,28539,0,0,12,\"FFFFFFFFFFFFFFFFFFFFFFFF\"");
 
@@ -75,17 +79,17 @@ uint8_t Onomondo::connect(char *server, int port) {
     }
 
     //network OK
-    if (leds_)
-        leds_->changeState(STATE_NETWRK_OK);
+    if (cb_)
+        cb_(STATE_NETWRK_OK);
 
+    //delay for visual effect :p
     delay(DEFAULT_DELAY);
 
-    if (leds_)
-        leds_->changeState(STATE_DATA);
+    if (cb_)
+        cb_(STATE_DATA);
 
     //set apn
     int n = 0;
-
     char apnString[50];
     sprintf(apnString, "+CSTT=\"%s\"", APN);
 
@@ -142,14 +146,14 @@ uint8_t Onomondo::connect(char *server, int port) {
 
     char buffer[50];
 
-    //initialize TCP Stack with server and port
+    //initialize TCP Stack with server and port // can be changed for UDP
     sprintf(buffer, "+CIPSTART=\"TCP\",\"%s\",\"%u\"", server, port);
     //Db("CMD: "); DB(buffer);
 
     delay(DEFAULT_DELAY);
     //connect TCP //wait for OK
     while (!(success = sendATExpectOK(buffer)) && n++ < 4) {
-        DB("Retrying... tcp connection stuff");
+        DB("Retrying... tcp initialization");
         delay(1000);
     }
     if (!success) {
@@ -159,8 +163,8 @@ uint8_t Onomondo::connect(char *server, int port) {
 
     TCPConnectionOK_ = true;
 
-    if (leds_)
-        leds_->changeState(STATE_DATA_OK);
+    if (cb_)
+        cb_(STATE_DATA_OK);
 
     return 1;
 }
@@ -182,12 +186,12 @@ uint8_t Onomondo::writeTCP(const char *data, const int &len) {
 
     delay(DEFAULT_DELAY);
 
-    if (leds_)
-        leds_->changeState(STATE_TRAFFIC);
+    if (cb_)
+        cb_(STATE_TRAFFIC);
 
     SerialAT.write((const uint8_t *)data, len);
     SerialMon.write((const uint8_t *)data, len);
-    //SerialAT.write(data,len);
+
     SerialAT.write(0x1a);  //^Z to start transmission
 
     //what for the modem to report something back..
@@ -199,8 +203,8 @@ uint8_t Onomondo::writeTCP(const char *data, const int &len) {
         SerialMon.write(SerialAT.read());
     }
 
-    if (leds_)
-        leds_->changeState(STATE_DATA_OK);
+    if (cb_)
+        cb_(STATE_DATA_OK);
 
     return 1;
 }
@@ -211,8 +215,8 @@ uint8_t Onomondo::disconnect() {
         ok = sendATExpectOK("+CIPCLOSE");
     }
 
-    if (leds_)
-        leds_->changeState(STATE_NETWRK_OK);
+    if (cb_)
+        cb_(STATE_NETWRK_OK);
 
     return ok;
 }

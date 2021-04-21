@@ -13,7 +13,6 @@ Onomondo *onomondo = NULL;
 
 Generic_LM75_9_to_12Bit tempSensor(&Wire, 0x48);
 
-//figure out why it was powered up
 esp_sleep_wakeup_cause_t wakeup_reason;
 
 #define uS_TO_S_FACTOR 1000000ULL /* Conversion factor for micro seconds to seconds */
@@ -58,7 +57,6 @@ void setup() {
     pinMode(V_BATT, INPUT);
 
     //Setup interrupt on Touch Pad 3 (GPIO15) (for wake up)
-
     esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
     //esp_sleep_enable_ext0_wakeup(GPIO_NUM_32, 1);
     touchAttachInterrupt(T9, callbackTouchpin, 40);
@@ -79,16 +77,18 @@ void setup() {
         poweroff();
     }
 
-    onomondo = new Onomondo(&leds);
+    //init modem
+    onomondo = new Onomondo(statusCallback);
 
     //temperature sensor
     initTempSensor();
 }
 
-void loop() {
-    Db("Woke up due to: ");
-    DB(wakeup_reason);
+void statusCallback(modemStates state) {
+    leds.changeState(state);
+}
 
+void loop() {
     //connect to the specified port
     bool connected = onomondo->connect("1.2.3.4", 4321);
 
@@ -103,27 +103,13 @@ void loop() {
     //send some payload 5 times..
     uint8_t TCPOk;
     for (int i = 0; i < 5; i++) {
-        // int tmp = 1000;  //don't wait forever in case of sensor fault..
-        // while (tempSensor.checkConversionReady() && tmp-- > 0) {
-        //     // waiiiiiit
-        //     // measurement IS ready long time ago. Just in case we do it like this.
-        //     delay(1);
-        // }
-
-        // Db("VAL OF TMP VAR: ");
-        // DB(tmp);
-
         //////////////////////////////////////////////
         ////HERE GOES WHATEVER SHOULD BE TRANSMITTED//
         //////////////////////////////////////////////
         doc["battery"] = getBatteryVoltage();
-
-        Db("SIGNAL: ");
-        DB(onomondo->getSignalQuality());
-
         doc["signal"] = onomondo->getSignalQuality();
         doc["temperature"] = (float)tempSensor.readTemperatureC();  //add the measurement to the document
-        DB(tempSensor.readTemperatureC());
+
         //serialize the json doc
         char serializedJson[200];
         int size = serializeJson(doc, serializedJson, sizeof(serializedJson));
