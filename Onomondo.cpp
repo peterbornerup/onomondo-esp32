@@ -124,7 +124,6 @@ uint8_t Onomondo::connect(char *server, int port) {
 
     //bring up GPRS
     while (!(success = sendATExpectOK("+CIICR")) && n++ < 10) {
-        //DB("Retrying... CIICR");
         delay(2000);
     }
     if (!success) {
@@ -148,10 +147,9 @@ uint8_t Onomondo::connect(char *server, int port) {
 
     //initialize TCP Stack with server and port // can be changed for UDP
     sprintf(buffer, "+CIPSTART=\"TCP\",\"%s\",\"%u\"", server, port);
-    //Db("CMD: "); DB(buffer);
 
     delay(DEFAULT_DELAY);
-    //connect TCP //wait for OK
+    //Init tcp stack on modem.
     while (!(success = sendATExpectOK(buffer)) && n++ < 4) {
         DB("Retrying... tcp initialization");
         delay(1000);
@@ -214,7 +212,6 @@ uint8_t Onomondo::disconnect() {
     if (TCPConnectionOK_) {
         ok = sendATExpectOK("+CIPCLOSE");
     }
-
     if (cb_)
         cb_(STATE_NETWRK_OK);
 
@@ -249,9 +246,6 @@ void Onomondo::_setup() {
     pinMode(LED_GPIO, OUTPUT);
     digitalWrite(LED_GPIO, LED_ON);
 
-    //modem_->sendAT("+CFUN=1");
-    //delay(1000);
-
     // on board blue LED
     digitalWrite(LED_GPIO, LED_ON);
 }
@@ -281,9 +275,6 @@ bool Onomondo::sendATExpectOKBase(const char *cmd) {
 
     while (SerialAT.available() && index < RESPONSE_BUFFER_SIZE - 1) {
         resp_[index] = SerialAT.read();
-
-        //Db(resp_[index]);
-
         index++;
     }
     resp_[index] = '\0';
@@ -292,18 +283,13 @@ bool Onomondo::sendATExpectOKBase(const char *cmd) {
     DB(resp_);
 
     //check if "OK" is in the string.
-    bool okExist = strstr(resp_, "OK") != NULL;
-
-    return okExist;
+    return = strstr(resp_, "OK") != NULL;
 }
 
 bool Onomondo::sendATOKResp(const char *cmd, const char *resp) {
     if (!sendATExpectOKBase(cmd)) {
         return false;
     }
-
     //check if resp is in the response buffer...
-    bool ok = strstr(resp_, resp) != NULL;
-
-    return ok;
+    return = strstr(resp_, resp) != NULL;
 }
