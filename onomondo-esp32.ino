@@ -24,6 +24,8 @@ esp_sleep_wakeup_cause_t wakeup_reason;
 #define V_BATT 36
 bool debug = true;
 
+volatile int touch = 0;
+
 void updateLeds() {
     // callback for the led handler. This will toggle the leds based on the current state.
     leds.periodicUpdate();
@@ -32,6 +34,7 @@ void updateLeds() {
 void callbackTouchpin() {
     // good for debug. Power off device if pressed during runtime.
     //poweroff();
+    ++touch;
 }
 
 float getBatteryVoltage() {
@@ -59,7 +62,7 @@ void setup() {
     //Setup interrupt on Touch Pad 3 (GPIO15) (for wake up)
     esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
     //esp_sleep_enable_ext0_wakeup(GPIO_NUM_32, 1);
-    touchAttachInterrupt(T9, callbackTouchpin, 40);
+    touchAttachInterrupt(T9, callbackTouchpin, 30);
     esp_sleep_enable_touchpad_wakeup();
 
     wakeup_reason = esp_sleep_get_wakeup_cause();
@@ -99,25 +102,35 @@ void loop() {
     if (!connected) {
         error();
     }
-
     //send some payload 5 times..
     uint8_t TCPOk;
-    for (int i = 0; i < 5; i++) {
-        //////////////////////////////////////////////
-        ////HERE GOES WHATEVER SHOULD BE TRANSMITTED//
-        //////////////////////////////////////////////
-        doc["battery"] = getBatteryVoltage();
-        doc["signal"] = onomondo->getSignalQuality();
-        doc["temperature"] = (float)tempSensor.readTemperatureC();  //add the measurement to the document
 
-        //serialize the json doc
-        char serializedJson[200];
-        int size = serializeJson(doc, serializedJson, sizeof(serializedJson));
+    uint32_t timestamp = millis();
 
-        //assuming everything is OK we can now transmit
-        //easy with Onomondo -> everything is handled on the serverside.
-        if (!onomondo->writeTCP(serializedJson, size)) {
-            error();
+    //wait here...
+    while (millis() - timestamp < 20000) {
+        if (touch == 0)
+            continue;
+
+        touch = 0;
+        timestamp = millis();
+        for (int i = 0; i < 1; i++) {
+            //////////////////////////////////////////////
+            ////HERE GOES WHATEVER SHOULD BE TRANSMITTED//
+            //////////////////////////////////////////////
+            doc["battery"] = getBatteryVoltage();
+            doc["signal"] = onomondo->getSignalQuality();
+            doc["temperature"] = (float)tempSensor.readTemperatureC();  //add the measurement to the document
+
+            //serialize the json doc
+            char serializedJson[200];
+            int size = serializeJson(doc, serializedJson, sizeof(serializedJson));
+
+            //assuming everything is OK we can now transmit
+            //easy with Onomondo -> everything is handled on the serverside.
+            if (!onomondo->writeTCP(serializedJson, size)) {
+                error();
+            }
         }
     }
 

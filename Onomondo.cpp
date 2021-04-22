@@ -174,7 +174,11 @@ uint8_t Onomondo::writeTCP(const char *data, const int &len) {
     bool success = false;
     int i = 0;
 
-    while (!(success = sendATExpectResp("+CIPSEND", ">")) && i++ < 5)
+    sendATExpectOK("+CMEE=2");
+
+    char atCmdString[50];
+    sprintf(atCmdString, "+CIPSEND=%d", len);
+    while (!(success = sendATExpectResp(atCmdString, ">")) && i++ < 5)
         delay(500);
 
     if (!success)
@@ -283,7 +287,7 @@ bool Onomondo::sendATExpectOKBase(const char *cmd) {
     DB(resp_);
 
     //check if "OK" is in the string.
-    return = strstr(resp_, "OK") != NULL;
+    return strstr(resp_, "OK") != NULL;
 }
 
 bool Onomondo::sendATOKResp(const char *cmd, const char *resp) {
@@ -291,5 +295,5 @@ bool Onomondo::sendATOKResp(const char *cmd, const char *resp) {
         return false;
     }
     //check if resp is in the response buffer...
-    return = strstr(resp_, resp) != NULL;
+    return strstr(resp_, resp) != NULL;
 }
